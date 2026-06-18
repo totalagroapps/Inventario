@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Movimiento - GAMS Inventario</title>
+    <link rel="manifest" href="/pwa/manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0f172a;
+            color: white;
+            margin: 0;
+            padding: 1.5rem;
+            box-sizing: border-box;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .back-btn {
+            background: none;
+            border: none;
+            color: #10b981;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0;
+            margin-right: 1rem;
+        }
+        .card {
+            background-color: #1e293b;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            margin-bottom: 1.5rem;
+            border: 1px solid #334155;
+        }
+        .ref-name {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #f8fafc;
+            margin: 0 0 0.5rem 0;
+        }
+        .ref-detail {
+            color: #94a3b8;
+            margin: 0.25rem 0;
+            font-size: 0.95rem;
+        }
+        .stock-badge {
+            display: inline-block;
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-top: 0.5rem;
+        }
+        .action-btns {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .btn-action {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .btn-action:active { transform: scale(0.95); }
+        .btn-entrada { background-color: #10b981; }
+        .btn-salida { background-color: #ef4444; }
+        .btn-action.selected {
+            box-shadow: 0 0 0 3px white;
+        }
+        .btn-action.dimmed { opacity: 0.5; }
+        
+        .form-container {
+            display: none;
+            background-color: #1e293b;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #cbd5e1;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background-color: #0f172a;
+            color: white;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 1rem;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        #success-msg {
+            display: none;
+            background-color: #064e3b;
+            color: #34d399;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #059669;
+        }
+        #error-msg {
+            display: none;
+            color: #ef4444;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="back-btn" onclick="window.location.href='/pwa/index.html'">← Volver</button>
+        <h2>Registro Movimiento</h2>
+    </div>
+
+    <div class="card" id="ref-card" style="display: none;">
+        <h3 class="ref-name" id="l-nombre">...</h3>
+        <p class="ref-detail">Código: <strong id="l-codigo">...</strong></p>
+        <p class="ref-detail">Peso unitario: <span id="l-peso">...</span> g</p>
+        <div class="stock-badge" id="l-stock">Stock: ... un</div>
+    </div>
+
+    <div id="actions-container" style="display: none;">
+        <div class="action-btns">
+            <button class="btn-action btn-entrada" id="btn-entrada">✅ ENTRADA</button>
+            <button class="btn-action btn-salida" id="btn-salida">🔴 SALIDA</button>
+        </div>
+
+        <div class="form-container" id="form-container">
+            <h3 id="form-title" style="margin-top: 0; color: #f8fafc;"></h3>
+            <div id="error-msg"></div>
+            <div class="form-group">
+                <label for="cantidad">Cantidad (unidades)</label>
+                <input type="number" id="cantidad" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="observacion">Observación (Opcional)</label>
+                <textarea id="observacion" rows="2"></textarea>
+            </div>
+            <button class="btn-submit" id="btn-submit">Confirmar Movimiento</button>
+        </div>
+    </div>
+
+    <div id="success-msg">
+        <h2 style="margin-top: 0;">✅ Movimiento Registrado</h2>
+        <p id="s-stock"></p>
+        <p id="s-peso"></p>
+        <button class="btn-submit" style="background-color: #10b981; margin-top: 1.5rem;" onclick="window.location.href='/pwa/index.html'">Escanear otro QR</button>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const refId = urlParams.get('ref');
+        const token = localStorage.getItem('token');
+
+        if (!token) window.location.href = '/pwa/login.html';
+        if (!refId) window.location.href = '/pwa/index.html';
+
+        let referenciaData = null;
+        let tipoMovimiento = null;
+
+        // Fetch Data
+        fetch(`/api/referencias/${refId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => {
+            if (res.status === 401) { localStorage.removeItem('token'); window.location.href = '/pwa/login.html'; }
+            if (!res.ok) throw new Error("Referencia no encontrada");
+            return res.json();
+        })
+        .then(data => {
+            referenciaData = data;
+            document.getElementById('l-nombre').innerText = data.nombre;
+            document.getElementById('l-codigo').innerText = data.codigo;
+            document.getElementById('l-peso').innerText = data.peso_unitario_gr;
+            document.getElementById('l-stock').innerText = `Stock disponible: ${data.stock_actual} ${data.unidad}s`;
+            
+            document.getElementById('ref-card').style.display = 'block';
+            document.getElementById('actions-container').style.display = 'block';
+        })
+        .catch(err => {
+            alert(err.message);
+            window.location.href = '/pwa/index.html';
+        });
+
+        // UI Logic
+        const btnEntrada = document.getElementById('btn-entrada');
+        const btnSalida = document.getElementById('btn-salida');
+        const formContainer = document.getElementById('form-container');
+        const formTitle = document.getElementById('form-title');
+
+        btnEntrada.addEventListener('click', () => selectTipo('entrada'));
+        btnSalida.addEventListener('click', () => selectTipo('salida'));
+
+        function selectTipo(tipo) {
+            tipoMovimiento = tipo;
+            formContainer.style.display = 'block';
+            if (tipo === 'entrada') {
+                btnEntrada.classList.add('selected');
+                btnEntrada.classList.remove('dimmed');
+                btnSalida.classList.remove('selected');
+                btnSalida.classList.add('dimmed');
+                formTitle.innerText = "Registrar Entrada";
+                formTitle.style.color = "#10b981";
+            } else {
+                btnSalida.classList.add('selected');
+                btnSalida.classList.remove('dimmed');
+                btnEntrada.classList.remove('selected');
+                btnEntrada.classList.add('dimmed');
+                formTitle.innerText = "Registrar Salida";
+                formTitle.style.color = "#ef4444";
+            }
+        }
+
+        // Submit Logic
+        document.getElementById('btn-submit').addEventListener('click', async () => {
+            const cantidad = parseInt(document.getElementById('cantidad').value);
+            const observacion = document.getElementById('observacion').value;
+            const errorMsg = document.getElementById('error-msg');
+            
+            errorMsg.style.display = 'none';
+
+            if (!cantidad || cantidad <= 0) {
+                errorMsg.innerText = "La cantidad debe ser mayor a 0";
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (tipoMovimiento === 'salida' && cantidad > referenciaData.stock_actual) {
+                errorMsg.innerText = `Stock insuficiente (Máximo: ${referenciaData.stock_actual})`;
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/movimientos/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        referencia_id: refId,
+                        tipo: tipoMovimiento,
+                        cantidad: cantidad,
+                        observacion: observacion
+                    })
+                });
+
+                const data = await res.json();
+                
+                if (res.ok) {
+                    document.getElementById('actions-container').style.display = 'none';
+                    document.getElementById('ref-card').style.display = 'none';
+                    document.getElementById('success-msg').style.display = 'block';
+                    
+                    const newStock = tipoMovimiento === 'entrada' ? 
+                        referenciaData.stock_actual + cantidad : 
+                        referenciaData.stock_actual - cantidad;
+                    
+                    const pesoTransacc = (cantidad * referenciaData.peso_unitario_gr).toFixed(1);
+                    
+                    document.getElementById('s-stock').innerText = `Nuevo stock: ${newStock} unidades`;
+                    document.getElementById('s-peso').innerText = `Peso despachado/recibido: ~${pesoTransacc} g`;
+                } else {
+                    errorMsg.innerText = data.detail || "Error al procesar";
+                    errorMsg.style.display = 'block';
+                }
+            } catch (err) {
+                errorMsg.innerText = "Error de conexión";
+                errorMsg.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

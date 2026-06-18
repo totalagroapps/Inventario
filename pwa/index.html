@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAMS Inventario</title>
+    <link rel="manifest" href="/pwa/manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0f172a;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        header {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-top: 1rem;
+        }
+        h1 {
+            color: #10b981;
+            margin: 0;
+            font-size: 2rem;
+        }
+        p.subtitle {
+            color: #cbd5e1;
+            margin-top: 0.5rem;
+        }
+        .main-btn {
+            background-color: #10b981;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            width: 100%;
+            max-width: 350px;
+            min-height: 80px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+        .main-btn:active {
+            transform: scale(0.98);
+        }
+        #reader {
+            width: 100%;
+            max-width: 350px;
+            display: none;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 2rem;
+        }
+        .logout-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: 1px solid #334155;
+            color: #cbd5e1;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <button class="logout-btn" onclick="logout()">Salir</button>
+    
+    <header>
+        <h1>GAMS Inventario</h1>
+        <p class="subtitle" id="user-info">Cargando...</p>
+    </header>
+
+    <button class="main-btn" id="scan-btn">
+        📷 ESCANEAR QR
+    </button>
+    <button class="main-btn" id="cancel-btn" style="display: none; background-color: #ef4444; margin-top: 1rem;">
+        ❌ CANCELAR
+    </button>
+
+    <div id="reader"></div>
+
+    <script>
+        // Check Auth
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/pwa/login.html';
+        }
+
+        // Fetch User Info
+        fetch('/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Unauthorized");
+            return res.json();
+        })
+        .then(data => {
+            document.getElementById('user-info').innerText = `Operario: ${data.username}`;
+        })
+        .catch(() => {
+            logout();
+        });
+
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = '/pwa/login.html';
+        }
+
+        // QR Scanner Logic
+        const html5QrCode = new Html5Qrcode("reader");
+        const scanBtn = document.getElementById('scan-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const readerDiv = document.getElementById('reader');
+
+        scanBtn.addEventListener('click', () => {
+            readerDiv.style.display = 'block';
+            scanBtn.style.display = 'none';
+            cancelBtn.style.display = 'flex';
+            
+            html5QrCode.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                (decodedText, decodedResult) => {
+                    // Success
+                    html5QrCode.stop().then(() => {
+                        // Validate format
+                        if (decodedText.includes('pwa/scan.html?ref=')) {
+                            window.location.href = decodedText;
+                        } else {
+                            alert("QR no válido para este sistema.");
+                            resetScannerUI();
+                        }
+                    }).catch(err => {
+                        console.error("Failed to stop scanning.", err);
+                    });
+                },
+                (errorMessage) => {
+                    // ignore
+                }
+            ).catch(err => {
+                alert(`Error al abrir cámara: ${err}`);
+                resetScannerUI();
+            });
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            html5QrCode.stop().then(() => {
+                resetScannerUI();
+            }).catch(err => {
+                console.error("Failed to stop scanning.", err);
+                resetScannerUI();
+            });
+        });
+
+        function resetScannerUI() {
+            readerDiv.style.display = 'none';
+            scanBtn.style.display = 'flex';
+            cancelBtn.style.display = 'none';
+        }
+
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/pwa/sw.js')
+                .then(reg => console.log('SW registered!', reg))
+                .catch(err => console.log('SW registration failed!', err));
+        }
+    </script>
+</body>
+</html>

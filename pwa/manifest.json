@@ -1,0 +1,16 @@
+{
+  "name": "GAMS Inventario",
+  "short_name": "GAMS Inv",
+  "description": "App para registro rápido de inventario mediante códigos QR",
+  "start_url": "/pwa/index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/QR_code_for_mobile_English_Wikipedia.svg/200px-QR_code_for_mobile_English_Wikipedia.svg.png",
+      "sizes": "200x200",
+      "type": "image/png"
+    }
+  ]
+}
