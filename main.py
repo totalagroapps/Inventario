@@ -3,6 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
@@ -67,3 +68,7 @@ app.mount("/panel", StaticFiles(directory=panel_dir, html=True), name="panel")
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+@app.get("/")
+def read_root():
+    return RedirectResponse(url="/panel/")
